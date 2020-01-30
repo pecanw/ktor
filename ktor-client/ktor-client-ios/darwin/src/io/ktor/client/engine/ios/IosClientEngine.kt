@@ -11,6 +11,7 @@ import io.ktor.client.request.*
 import io.ktor.client.utils.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import io.ktor.network.sockets.*
 import io.ktor.util.date.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
@@ -45,7 +46,9 @@ internal class IosClientEngine(override val config: IosClientEngineConfig) : Htt
 
                     if (didCompleteWithError != null) {
                         val mappedException = when (didCompleteWithError.code) {
-                            NSURLErrorTimedOut -> HttpSocketTimeoutException(data)
+                            NSURLErrorTimedOut -> SocketTimeoutException(
+                                data
+                            )
                             else -> IosHttpRequestException(didCompleteWithError)
                         }
 

@@ -4,9 +4,10 @@
 
 package io.ktor.client.engine.apache
 
-import io.ktor.client.features.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.network.sockets.*
+import io.ktor.network.sockets.SocketTimeoutException
 import io.ktor.util.date.*
 import kotlinx.coroutines.*
 import org.apache.http.concurrent.*
@@ -38,10 +39,10 @@ internal suspend fun CloseableHttpAsyncClient.sendRequest(
     val callback = object : FutureCallback<Unit> {
         override fun failed(exception: Exception) {
             val mappedCause = when {
-                exception is ConnectException && exception.isTimeoutException() -> HttpConnectTimeoutException(
+                exception is ConnectException && exception.isTimeoutException() -> ConnectTimeoutException(
                     requestData
                 )
-                exception is SocketTimeoutException -> HttpSocketTimeoutException(requestData)
+                exception is java.net.SocketTimeoutException -> SocketTimeoutException(requestData)
                 else -> exception
             }
 

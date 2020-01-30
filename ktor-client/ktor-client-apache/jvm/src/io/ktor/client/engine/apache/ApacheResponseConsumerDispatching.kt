@@ -4,8 +4,9 @@
 
 package io.ktor.client.engine.apache
 
-import io.ktor.client.features.*
 import io.ktor.client.request.*
+import io.ktor.network.sockets.*
+import io.ktor.network.sockets.SocketTimeoutException
 import io.ktor.utils.io.*
 import kotlinx.atomicfu.*
 import kotlinx.coroutines.*
@@ -122,8 +123,8 @@ internal class ApacheResponseConsumerDispatching(
 
     override fun failed(cause: Exception) {
         val mappedCause = when {
-            cause is ConnectException && cause.isTimeoutException() -> HttpConnectTimeoutException(requestData!!)
-            cause is SocketTimeoutException -> HttpSocketTimeoutException(requestData!!)
+            cause is ConnectException && cause.isTimeoutException() -> ConnectTimeoutException(requestData!!)
+            cause is java.net.SocketTimeoutException -> SocketTimeoutException(requestData!!)
             else -> cause
         }
 

@@ -6,12 +6,14 @@ package io.ktor.client.engine.android
 
 import io.ktor.client.features.*
 import io.ktor.client.request.*
+import io.ktor.network.sockets.*
 import io.ktor.util.cio.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.*
 import java.io.*
 import java.net.*
+import java.net.SocketTimeoutException
 import kotlin.coroutines.*
 
 /**
@@ -52,7 +54,7 @@ internal suspend fun HttpURLConnection.timeoutAwareConnect(request: HttpRequestD
         // Allow to throw request timeout cancellation exception instead of connect timeout exception if needed.
         yield()
         throw when (cause) {
-            is SocketTimeoutException -> HttpConnectTimeoutException(request)
+            is SocketTimeoutException -> ConnectTimeoutException(request)
             else -> cause
         }
     }

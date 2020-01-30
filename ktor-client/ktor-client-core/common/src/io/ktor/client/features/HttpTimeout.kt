@@ -8,7 +8,6 @@ import io.ktor.client.*
 import io.ktor.client.engine.*
 import io.ktor.client.request.*
 import io.ktor.util.*
-import io.ktor.utils.io.errors.*
 import kotlinx.coroutines.*
 import kotlin.native.concurrent.*
 
@@ -141,37 +140,11 @@ fun HttpRequestBuilder.timeout(block: HttpTimeout.HttpTimeoutCapabilityConfigura
 /**
  * This exception is thrown in case request timeout exceeded.
  */
-class HttpRequestTimeoutException(request: HttpRequestBuilder) :
-    CancellationException(
-        "Request timeout has been expired [url=${request.url}, request_timeout=${request.getCapabilityOrNull(
-            HttpTimeout
-        )?.requestTimeoutMillis ?: "unknown"} ms]"
-    )
+class HttpRequestTimeoutException(
+    request: HttpRequestBuilder
+) : CancellationException(
+    "Request timeout has been expired [url=${request.url}, request_timeout=${request.getCapabilityOrNull(
+        HttpTimeout
+    )?.requestTimeoutMillis ?: "unknown"} ms]"
+)
 
-/**
- * This exception is thrown in case connect timeout exceeded.
- */
-expect class HttpConnectTimeoutException(request: HttpRequestData) : IOException
-
-/**
- * This exception is thrown in case socket timeout (read or write) exceeded.
- */
-expect class HttpSocketTimeoutException(request: HttpRequestData) : IOException
-
-/**
- * Convert long timeout in milliseconds to int value. To do that we need to consider [HttpTimeout.INFINITE_TIMEOUT_MS]
- * as zero and convert timeout value to [Int].
- */
-@InternalAPI
-fun convertLongTimeoutToIntWithInfiniteAsZero(timeout: Long): Int = when {
-    timeout == HttpTimeout.INFINITE_TIMEOUT_MS -> 0
-    timeout < Int.MIN_VALUE -> Int.MIN_VALUE
-    timeout > Int.MAX_VALUE -> Int.MAX_VALUE
-    else -> timeout.toInt()
-}
-
-@InternalAPI
-fun convertLongTimeoutToLongWithInfiniteAsZero(timeout: Long): Long = when (timeout) {
-    HttpTimeout.INFINITE_TIMEOUT_MS -> 0L
-    else -> timeout
-}

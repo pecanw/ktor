@@ -16,6 +16,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.io.*
 import java.net.*
+import java.net.SocketTimeoutException
 import java.nio.channels.*
 import kotlin.coroutines.*
 
@@ -121,7 +122,7 @@ internal class Endpoint(
             response.resume(responseData)
         } catch (cause: Throwable) {
             val mappedException = when (cause.rootCause) {
-                is SocketTimeoutException -> HttpSocketTimeoutException(task.request)
+                is SocketTimeoutException -> io.ktor.network.sockets.SocketTimeoutException(task.request)
                 else -> cause
             }
             response.resumeWithException(mappedException)
@@ -210,7 +211,7 @@ internal class Endpoint(
      */
     private fun getTimeoutException(retryAttempts: Int, timeoutFails: Int, request: HttpRequestData) =
         when (timeoutFails) {
-            retryAttempts -> HttpConnectTimeoutException(request)
+            retryAttempts -> ConnectTimeoutException(request)
             else -> FailToConnectException()
         }
 
