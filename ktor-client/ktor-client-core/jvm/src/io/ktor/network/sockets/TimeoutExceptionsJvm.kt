@@ -11,21 +11,17 @@ import io.ktor.utils.io.*
 import kotlinx.coroutines.*
 import java.net.*
 
+/**
+ * This exception is thrown in case connect timeout exceeded.
+ */
 @Suppress("ACTUAL_WITHOUT_EXPECT")
-actual class ConnectTimeoutException actual constructor(request: HttpRequestData) :
-    ConnectException(
-        "Connect timeout has been expired [url=${request.url}, connect_timeout=${request.getCapabilityOrNull(
-            HttpTimeout
-        )?.connectTimeoutMillis ?: "unknown"} ms]"
-    )
+actual class ConnectTimeoutException actual constructor(message: String) : ConnectException(message)
 
+/**
+ * This exception is thrown in case socket timeout (read or write) exceeded.
+ */
 @Suppress("ACTUAL_WITHOUT_EXPECT")
-actual class SocketTimeoutException actual constructor(request: HttpRequestData) :
-    java.net.SocketTimeoutException(
-        "Socket timeout has been expired [url=${request.url}, socket_timeout=${request.getCapabilityOrNull(
-            HttpTimeout
-        )?.socketTimeoutMillis ?: "unknown"}] ms"
-    )
+actual class SocketTimeoutException actual constructor(message: String) : java.net.SocketTimeoutException(message)
 
 /**
  * Returns [ByteReadChannel] with [ByteChannel.close] handler that returns [SocketTimeoutException] instead of

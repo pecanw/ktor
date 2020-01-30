@@ -122,7 +122,7 @@ internal class Endpoint(
             response.resume(responseData)
         } catch (cause: Throwable) {
             val mappedException = when (cause.rootCause) {
-                is SocketTimeoutException -> io.ktor.network.sockets.SocketTimeoutException(task.request)
+                is SocketTimeoutException -> SocketTimeoutException(task.request)
                 else -> cause
             }
             response.resumeWithException(mappedException)

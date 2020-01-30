@@ -4,28 +4,14 @@
 
 package io.ktor.network.sockets
 
-import io.ktor.client.features.*
-import io.ktor.client.request.*
 import io.ktor.utils.io.errors.*
 
 /**
- * HTTP connect timeout exception.
+ * This exception is thrown in case connect timeout exceeded.
  */
-@Suppress("ACTUAL_WITHOUT_EXPECT")
-actual class ConnectTimeoutException actual constructor(request: HttpRequestData) :
-    IOException(
-        "Connect timeout has been expired [url=${request.url}, connect_timeout=${request.getCapabilityOrNull(
-            HttpTimeout
-        )?.connectTimeoutMillis ?: "unknown"} ms]"
-    )
+actual class ConnectTimeoutException actual constructor(message: String) : IOException(message)
 
 /**
- * HTTP socket timeout exception.
+ * This exception is thrown in case socket timeout (read or write) exceeded.
  */
-@Suppress("ACTUAL_WITHOUT_EXPECT")
-actual class SocketTimeoutException actual constructor(request: HttpRequestData) :
-    IOException(
-        "Socket timeout has been expired [url=${request.url}, socket_timeout=${request.getCapabilityOrNull(
-            HttpTimeout
-        )?.socketTimeoutMillis ?: "unknown"}] ms"
-    )
+actual class SocketTimeoutException actual constructor(message: String) : IOException(message)

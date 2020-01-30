@@ -4,9 +4,8 @@
 
 package io.ktor.client.engine.apache
 
+import io.ktor.client.features.*
 import io.ktor.client.request.*
-import io.ktor.network.sockets.*
-import io.ktor.network.sockets.SocketTimeoutException
 import io.ktor.utils.io.*
 import kotlinx.atomicfu.*
 import kotlinx.coroutines.*

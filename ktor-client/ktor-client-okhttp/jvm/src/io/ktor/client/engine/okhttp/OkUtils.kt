@@ -4,9 +4,9 @@
 
 package io.ktor.client.engine.okhttp
 
+import io.ktor.client.features.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.network.sockets.*
 import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.Headers
