@@ -9,7 +9,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.client.tests.utils.*
 import io.ktor.utils.io.core.*
-import kotlin.math.*
 import kotlin.test.*
 
 class HttpStatementTest : ClientLoader() {

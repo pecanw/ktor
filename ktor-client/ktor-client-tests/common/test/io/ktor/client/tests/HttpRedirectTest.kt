@@ -10,9 +10,9 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.client.tests.utils.*
 import io.ktor.http.*
-import io.ktor.utils.io.core.*
 import kotlin.test.*
 
+@Suppress("PublicApiImplicitType")
 class HttpRedirectTest : ClientLoader() {
     private val TEST_URL_BASE = "$TEST_SERVER/redirect"
 
@@ -91,6 +91,15 @@ class HttpRedirectTest : ClientLoader() {
     }
 
     @Test
+    fun testMultipleRedirectRelative() = clientTests {
+        test { client ->
+            client.get<HttpStatement>("$TEST_URL_BASE/multipleRedirects/login").execute {
+                assertEquals("account details", it.readText())
+            }
+        }
+    }
+
+    @Test
     fun testRedirectAbsolute() = clientTests {
         test { client ->
             client.get<HttpStatement>("$TEST_URL_BASE/directory/absoluteRedirectFile").execute {
@@ -103,8 +112,8 @@ class HttpRedirectTest : ClientLoader() {
     fun testRedirectHostAbsolute() = clientTests(listOf("Js")) {
         test { client ->
             client.get<HttpStatement>("$TEST_URL_BASE/directory/hostAbsoluteRedirect").execute {
-                assertEquals("200 OK", it.readText())
-                assertEquals("https://httpstat.us/200", it.call.request.url.toString())
+                assertEquals("OK", it.readText())
+                assertEquals("$TEST_URL_BASE/get", it.call.request.url.toString())
             }
         }
     }

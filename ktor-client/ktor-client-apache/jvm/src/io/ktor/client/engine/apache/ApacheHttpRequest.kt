@@ -38,15 +38,15 @@ internal suspend fun CloseableHttpAsyncClient.sendRequest(
     val callback = object : FutureCallback<Unit> {
         override fun failed(exception: Exception) {
             val mappedCause = when {
-                exception is ConnectException && exception.isTimeoutException() -> HttpConnectTimeoutException(
-                    requestData
+                exception is ConnectException && exception.isTimeoutException() -> ConnectTimeoutException(
+                    requestData, exception
                 )
-                exception is SocketTimeoutException -> HttpSocketTimeoutException(requestData)
+                exception is java.net.SocketTimeoutException -> SocketTimeoutException(requestData, exception)
                 else -> exception
             }
 
+            continuation.cancel(mappedCause)
             callContext.cancel(CancellationException("Failed to execute request", mappedCause))
-            continuation.cancel(exception)
         }
 
         override fun completed(result: Unit) {}
@@ -58,6 +58,13 @@ internal suspend fun CloseableHttpAsyncClient.sendRequest(
     }
 
     execute(request, consumer, callback).apply {
+        @OptIn(InternalCoroutinesApi::class)
+        callContext[Job]?.invokeOnCompletion(onCancelling = true) { cause ->
+            if (cause != null) {
+                cancel(true)
+            }
+        }
+
         // We need to cancel Apache future if it's not needed anymore.
         continuation.invokeOnCancellation {
             cancel(true)

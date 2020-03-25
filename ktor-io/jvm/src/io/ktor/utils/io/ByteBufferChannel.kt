@@ -62,7 +62,7 @@ internal open class ByteBufferChannel(
 
     internal fun getJoining(): JoiningState? = joining
 
-    @UseExperimental(InternalCoroutinesApi::class)
+    @OptIn(InternalCoroutinesApi::class)
     override fun attachJob(job: Job) {
         // TODO actually it looks like one-direction attachChild API
         attachedJob?.cancel()
@@ -70,7 +70,7 @@ internal open class ByteBufferChannel(
         job.invokeOnCompletion(onCancelling = true) { cause ->
             attachedJob = null
             if (cause != null) {
-                cancel(CancellationException("Channel closed due to job failure").apply { initCause(cause) })
+                cancel(cause)
             }
         }
     }
@@ -1684,6 +1684,7 @@ internal open class ByteBufferChannel(
         val state = state
         if (state is ReadWriteBufferState.Reading || state is ReadWriteBufferState.ReadingWriting) {
             restoreStateAfterRead()
+            tryTerminate()
         }
     }
 
@@ -1916,7 +1917,9 @@ internal open class ByteBufferChannel(
 
         state.let { s ->
             if (!s.capacity.tryReadExact(n)) throw IllegalStateException("Unable to consume $n bytes: not enough available bytes")
-            s.readBuffer.bytesRead(s.capacity, n)
+            if (n > 0) {
+                s.readBuffer.bytesRead(s.capacity, n)
+            }
         }
     }
 

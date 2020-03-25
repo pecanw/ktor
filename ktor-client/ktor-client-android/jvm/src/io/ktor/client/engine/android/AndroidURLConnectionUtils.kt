@@ -6,6 +6,7 @@ package io.ktor.client.engine.android
 
 import io.ktor.client.features.*
 import io.ktor.client.request.*
+import io.ktor.network.sockets.*
 import io.ktor.util.cio.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.jvm.javaio.*
@@ -42,7 +43,7 @@ private fun HttpURLConnection.setupRequestTimeoutAttributes(
 }
 
 /**
- * Call [HttpURLConnection.connect] catching [SocketTimeoutException] and returning [HttpSocketTimeoutException] instead
+ * Call [HttpURLConnection.connect] catching [java.net.SocketTimeoutException] and returning [SocketTimeoutException] instead
  * of it. If request timeout happens earlier [HttpRequestTimeoutException] will be thrown.
  */
 internal suspend fun HttpURLConnection.timeoutAwareConnect(request: HttpRequestData) {
@@ -51,8 +52,8 @@ internal suspend fun HttpURLConnection.timeoutAwareConnect(request: HttpRequestD
     } catch (cause: Throwable) {
         // Allow to throw request timeout cancellation exception instead of connect timeout exception if needed.
         yield()
-        throw when (cause) {
-            is SocketTimeoutException -> HttpConnectTimeoutException(request)
+        throw when {
+            cause.isTimeoutException() -> ConnectTimeoutException(request, cause)
             else -> cause
         }
     }
@@ -69,3 +70,9 @@ internal fun HttpURLConnection.content(callContext: CoroutineContext, request: H
     context = callContext,
     pool = KtorDefaultPool
 )?.let { CoroutineScope(callContext).mapEngineExceptions(it, request) } ?: ByteReadChannel.Empty
+
+/**
+ * Checks the exception and identifies timeout exception by it.
+ */
+private fun Throwable.isTimeoutException(): Boolean =
+    this is java.net.SocketTimeoutException || (this is ConnectException && message?.contains("timed out") ?: false)

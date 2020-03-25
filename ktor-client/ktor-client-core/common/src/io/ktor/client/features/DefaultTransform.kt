@@ -65,6 +65,12 @@ fun HttpClient.defaultTransformers() {
             }
             ByteArray::class -> {
                 val readRemaining = body.readRemaining(contentLength)
+                if (contentLength < Long.MAX_VALUE) {
+                    check(readRemaining.remaining == contentLength) {
+                        "Expected $contentLength, actual ${readRemaining.remaining}"
+                    }
+                }
+
                 proceedWith(HttpResponseContainer(info, readRemaining.readBytes()))
             }
             ByteReadChannel::class -> {
@@ -73,8 +79,10 @@ fun HttpClient.defaultTransformers() {
                         body.copyTo(channel, limit = Long.MAX_VALUE)
                     } catch (cause: CancellationException) {
                         response.cancel(cause)
+                        throw cause
                     } catch (cause: Throwable) {
                         response.cancel("Receive failed", cause)
+                        throw cause
                     } finally {
                         response.complete()
                     }

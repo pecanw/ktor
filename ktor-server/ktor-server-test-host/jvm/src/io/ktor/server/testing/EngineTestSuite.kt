@@ -122,6 +122,25 @@ abstract class EngineTestSuite<TEngine : ApplicationEngine, TConfiguration : App
     }
 
     @Test
+    fun testBinaryUsingChannel() {
+        createAndStartServer {
+            handle {
+                call.respondBytesWriter {
+                    writeByte(25)
+                    writeByte(37)
+                    writeByte(42)
+                }
+            }
+        }
+
+        withUrl("/") {
+            assertEquals(200, status.value)
+            assertEquals(ContentType.Application.OctetStream, contentType())
+            assertTrue(byteArrayOf(25, 37, 42).contentEquals(readBytes()))
+        }
+    }
+
+    @Test
     fun testLoggerOnError() {
         val message = "expected, ${Random().nextLong()}"
         val collected = LinkedBlockingQueue<Throwable>()
@@ -1086,6 +1105,27 @@ abstract class EngineTestSuite<TEngine : ApplicationEngine, TConfiguration : App
         }
         withUrl("/uri/1") {
             assertEquals("/uri/1", readText())
+        }
+    }
+
+    @Test
+    fun testRemoteHost() {
+        createAndStartServer {
+            handle {
+                call.respondText {
+                    call.request.local.remoteHost
+                }
+            }
+        }
+
+        withUrl("/") {
+            readText().also { text ->
+                assertNotNull(
+                    listOf("localhost", "127.0.0.1", "::1", "0:0:0:0:0:0:0:1").find {
+                        it == text
+                    }
+                )
+            }
         }
     }
 

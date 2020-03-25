@@ -13,7 +13,7 @@ import kotlin.test.*
 class WebSocketTest : ClientLoader() {
 
     @Test
-    fun testEcho() = clientTests(listOf("Apache", "Android")) {
+    fun testEcho() = clientTests(listOf("Apache", "Android", "iOS")) {
         config {
             install(WebSockets)
         }
@@ -30,7 +30,7 @@ class WebSocketTest : ClientLoader() {
     }
 
     @Test
-    fun testClose() = clientTests(listOf("Apache", "Android")) {
+    fun testClose() = clientTests(listOf("Apache", "Android", "iOS")) {
         config {
             install(WebSockets)
         }
@@ -42,6 +42,26 @@ class WebSocketTest : ClientLoader() {
                     val closeReason = closeReason.await()!!
                     assertEquals("End", closeReason.message)
                     assertEquals(1000, closeReason.code)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun testCancel() = clientTests(listOf("Apache", "Android", "Js", "iOS")) {
+        config {
+            install(WebSockets)
+
+            test { client ->
+                io.ktor.client.tests.utils.assertFailsWith<CancellationException> {
+                    withTimeout(1000) {
+                        client.webSocket("$TEST_WEBSOCKET_SERVER/websockets/echo") {
+                            repeat(10) {
+                                send(Frame.Text("Hello"))
+                                delay(250)
+                            }
+                        }
+                    }
                 }
             }
         }

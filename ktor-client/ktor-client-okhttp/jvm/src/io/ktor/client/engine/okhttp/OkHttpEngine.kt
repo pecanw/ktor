@@ -11,15 +11,15 @@ import io.ktor.client.request.*
 import io.ktor.client.utils.*
 import io.ktor.http.*
 import io.ktor.http.content.*
+import io.ktor.network.sockets.*
 import io.ktor.util.*
 import io.ktor.util.date.*
-import kotlinx.coroutines.*
 import io.ktor.utils.io.*
+import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.internal.http.HttpMethod
 import okio.*
 import java.io.*
-import java.net.*
 import java.util.concurrent.*
 import kotlin.coroutines.*
 
@@ -27,19 +27,39 @@ import kotlin.coroutines.*
 @Suppress("KDocMissingDocumentation")
 class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineBase("ktor-okhttp") {
 
-    override val dispatcher by lazy {
+    public override val dispatcher: CoroutineDispatcher by lazy {
         Dispatchers.clientDispatcher(
             config.threadsCount,
             "ktor-okhttp-dispatcher"
         )
     }
 
-    override val supportedCapabilities = setOf(HttpTimeout)
+    public override val supportedCapabilities: Set<HttpTimeout.Feature> = setOf(HttpTimeout)
+
+    private val requestsJob: CoroutineContext
+
+    override val coroutineContext: CoroutineContext
 
     /**
      * Cache that keeps least recently used [OkHttpClient] instances.
      */
     private val clientCache = createLRUCache(::createOkHttpClient, {}, config.clientCacheSize)
+    init {
+        val parent = super.coroutineContext[Job]!!
+        requestsJob = SilentSupervisor(parent)
+        coroutineContext = super.coroutineContext + requestsJob
+
+        GlobalScope.launch(super.coroutineContext, start = CoroutineStart.ATOMIC) {
+            try {
+                requestsJob[Job]!!.join()
+            } finally {
+                clientCache.forEach { (_, client) ->
+                    client.connectionPool.evictAll()
+                }
+                (dispatcher as Closeable).close()
+            }
+        }
+    }
 
     override suspend fun execute(data: HttpRequestData): HttpResponseData {
         val callContext = callContext()
@@ -57,19 +77,7 @@ class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineBase("kt
 
     override fun close() {
         super.close()
-
-        coroutineContext[Job]!!.invokeOnCompletion {
-            GlobalScope.launch(dispatcher) {
-                // The engine dispatcher and the cache are not closed because:
-                // 1. If the engine was created by Ktor it shares common dispatcher and cache.
-                // 2. If the engine was created by a user the user is responsible for lifecycle management.
-                clientCache.forEach { (_, client) ->
-                    client.connectionPool().evictAll()
-                }
-            }.invokeOnCompletion {
-                (dispatcher as Closeable).close()
-            }
-        }
+        (requestsJob[Job] as CompletableJob).complete()
     }
 
     private suspend fun executeWebSocketRequest(
@@ -93,7 +101,7 @@ class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineBase("kt
         val requestTime = GMTDate()
         val response = engine.execute(engineRequest, requestData)
 
-        val body = response.body()
+        val body = response.body
         callContext[Job]!!.invokeOnCompletion { body?.close() }
 
         val responseContent = body?.source()?.toChannel(callContext, requestData) ?: ByteReadChannel.Empty
@@ -103,9 +111,9 @@ class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineBase("kt
     private fun buildResponseData(
         response: Response, requestTime: GMTDate, body: Any, callContext: CoroutineContext
     ): HttpResponseData {
-        val status = HttpStatusCode(response.code(), response.message())
-        val version = response.protocol().fromOkHttp()
-        val headers = response.headers().fromOkHttp()
+        val status = HttpStatusCode(response.code, response.message)
+        val version = response.protocol.fromOkHttp()
+        val headers = response.headers.fromOkHttp()
 
         return HttpResponseData(status, requestTime, headers, version, body, callContext)
     }
@@ -121,7 +129,7 @@ class OkHttpEngine(override val config: OkHttpConfig) : HttpClientEngineBase("kt
     }
 
     private fun createOkHttpClient(timeoutExtension: HttpTimeout.HttpTimeoutCapabilityConfiguration?): OkHttpClient {
-        val builder = okHttpClientPrototype.newBuilder()
+        val builder = (config.preconfigured ?: okHttpClientPrototype).newBuilder()
 
         builder.apply(config.config)
         config.proxy?.let { builder.proxy(it) }
@@ -149,8 +157,8 @@ private fun BufferedSource.toChannel(context: CoroutineContext, requestData: Htt
         }
     }.channel
 
-private fun mapExceptions(cause: Throwable, request: HttpRequestData) = when (cause) {
-    is SocketTimeoutException -> HttpSocketTimeoutException(request)
+private fun mapExceptions(cause: Throwable, request: HttpRequestData): Throwable = when (cause) {
+    is java.net.SocketTimeoutException -> SocketTimeoutException(request, cause)
     else -> cause
 }
 

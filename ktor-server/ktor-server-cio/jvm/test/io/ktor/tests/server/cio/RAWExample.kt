@@ -7,6 +7,7 @@ package io.ktor.tests.server.cio
 import io.ktor.http.*
 import io.ktor.http.cio.*
 import io.ktor.server.cio.*
+import io.ktor.server.cio.backend.*
 import io.ktor.util.date.*
 import kotlinx.coroutines.*
 import io.ktor.utils.io.*
@@ -36,10 +37,7 @@ fun main(args: Array<String>) {
         }
     }
 
-    val server = GlobalScope.httpServer(settings, handler = { request: Request,
-                                                              _: ByteReadChannel,
-                                                              output: ByteWriteChannel,
-                                                              _: CompletableDeferred<Boolean>? ->
+    val server = GlobalScope.httpServer(settings, handler = { request ->
         try {
             if (request.uri.length == 1 && request.uri[0] == '/' && request.method == HttpMethod.Get) {
                 val response = RequestResponseBuilder()

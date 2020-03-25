@@ -2,10 +2,6 @@ apply from: rootProject.file("gradle/ide.gradle")
 
 apply plugin: "kotlinx-atomicfu"
 
-if (project.name != 'ktor-client-curl') {
-    apply from: rootProject.file("gradle/native.gradle")
-}
-
 def getHostName() {
     def target = System.getProperty("os.name")
     if (target == 'Linux') return 'linux'
@@ -81,7 +77,7 @@ kotlin {
         }
 
         configure(project.ext.nativeTargets) {
-            binaries.getTest("DEBUG").optimized = true
+            binaries.getTest("DEBUG").optimized = false
         }
 
         project.ext.nativeCompilations = project.ext.nativeTargets.collect { it.compilations.main }

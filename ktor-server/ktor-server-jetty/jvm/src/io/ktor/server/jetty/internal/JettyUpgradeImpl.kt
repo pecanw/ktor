@@ -31,7 +31,7 @@ object JettyUpgradeImpl : ServletUpgrade {
         // for upgraded connections IDLE timeout should be significantly increased
         endPoint.idleTimeout = TimeUnit.MINUTES.toMillis(60L)
 
-        withContext(engineContext) {
+        withContext(engineContext + CoroutineName("upgrade-scope")) {
             try {
                 coroutineScope {
                     val inputChannel = ByteChannel(autoFlush = true)
@@ -43,10 +43,16 @@ object JettyUpgradeImpl : ServletUpgrade {
                     if (endPoint is AbstractEndPoint) {
                         endPoint.upgrade(reader)
                     }
-                    upgrade.upgrade(
+                    val upgradeJob = upgrade.upgrade(
                         inputChannel, outputChannel, coroutineContext,
                         coroutineContext + userContext
                     )
+
+                    upgradeJob.invokeOnCompletion {
+                        inputChannel.cancel()
+                        outputChannel.close()
+                        cancel()
+                    }
                 }
             } finally {
                 connection.close()

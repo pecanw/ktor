@@ -47,14 +47,18 @@ internal class NettyHttp2ApplicationRequest(
         }
     }
 
-    @UseExperimental(ObsoleteCoroutinesApi::class)
+    @OptIn(ObsoleteCoroutinesApi::class)
     val contentActor = actor<Http2DataFrame>(
         Dispatchers.Unconfined, kotlinx.coroutines.channels.Channel.UNLIMITED
     ) {
         http2frameLoop(contentByteChannel)
     }
 
-    override val local = Http2LocalConnectionPoint(nettyHeaders, context.channel().localAddress() as? InetSocketAddress)
+    override val local = Http2LocalConnectionPoint(
+        nettyHeaders,
+        context.channel().localAddress() as? InetSocketAddress,
+        context.channel().remoteAddress() as? InetSocketAddress
+    )
 
     override val cookies: RequestCookies
         get() = throw UnsupportedOperationException()

@@ -346,7 +346,8 @@ abstract class ByteChannelSequentialBase(
 
         val builder = BytePacketBuilder(headerSizeHint)
 
-        builder.writePacket(readable, minOf(limit, readable.remaining))
+        val size = minOf(limit, readable.remaining)
+        builder.writePacket(readable, size)
         val remaining = limit - builder.size
 
         return if (remaining == 0L || (readable.isEmpty && closed)) {
@@ -354,7 +355,7 @@ abstract class ByteChannelSequentialBase(
             ensureNotFailed(builder)
             builder.build()
         } else {
-            readRemainingSuspend(builder, remaining)
+            readRemainingSuspend(builder, limit)
         }
     }
 
@@ -365,7 +366,9 @@ abstract class ByteChannelSequentialBase(
             afterRead()
             ensureNotFailed(builder)
 
-            if (readable.remaining == 0L && writable.size == 0 && closed) break
+            if (readable.remaining == 0L && writable.size == 0 && closed) {
+                break
+            }
 
             awaitSuspend(1)
         }
@@ -544,7 +547,12 @@ abstract class ByteChannelSequentialBase(
 
     override fun discard(n: Int): Int {
         closedCause?.let { throw it }
-        return readable.discard(n).also { afterRead() }
+        if (n == 0) return 0
+
+        return readable.discard(n).also {
+            afterRead()
+            requestNextView(1)
+        }
     }
 
     override fun request(atLeast: Int): IoBuffer? {
@@ -552,6 +560,10 @@ abstract class ByteChannelSequentialBase(
 
         completeReading()
 
+        return requestNextView(atLeast)
+    }
+
+    private fun requestNextView(atLeast: Int): IoBuffer? {
         val view = readable.prepareReadHead(atLeast) as IoBuffer?
 
         if (view == null) {
@@ -620,7 +632,7 @@ abstract class ByteChannelSequentialBase(
 
             return false
         }
-        @UseExperimental(DangerousInternalIoApi::class)
+        @OptIn(DangerousInternalIoApi::class)
         return decodeUTF8LineLoopSuspend(out, limit) { size ->
             afterRead()
             if (await(size)) readable
@@ -642,7 +654,7 @@ abstract class ByteChannelSequentialBase(
         return close(cause ?: io.ktor.utils.io.CancellationException("Channel cancelled"))
     }
 
-    final override fun close(cause: Throwable?): Boolean {
+    override fun close(cause: Throwable?): Boolean {
         if (closed || closedCause != null) return false
         closedCause = cause
         closed = true

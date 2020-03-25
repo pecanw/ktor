@@ -10,14 +10,19 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.*
+import kotlinx.serialization.builtins.*
 import kotlinx.serialization.internal.*
 import kotlinx.serialization.json.*
+import kotlinx.serialization.list
+import kotlinx.serialization.set
 import kotlin.reflect.*
 
 /**
  * A [JsonSerializer] implemented for kotlinx [Serializable] classes.
  */
-@UseExperimental(ImplicitReflectionSerializer::class, UnstableDefault::class)
+@OptIn(
+    ImplicitReflectionSerializer::class, UnstableDefault::class
+)
 class KotlinxSerializer(
     private val json: Json = Json.plain
 ) : JsonSerializer {
@@ -78,7 +83,7 @@ class KotlinxSerializer(
 }
 
 @Suppress("UNCHECKED_CAST")
-@UseExperimental(ImplicitReflectionSerializer::class)
+@OptIn(ImplicitReflectionSerializer::class)
 private fun buildSerializer(value: Any): KSerializer<*> = when (value) {
     is JsonElement -> JsonElementSerializer
     is List<*> -> value.elementSerializer().list
@@ -87,13 +92,12 @@ private fun buildSerializer(value: Any): KSerializer<*> = when (value) {
     is Map<*, *> -> {
         val keySerializer = value.keys.elementSerializer() as KSerializer<Any>
         val valueSerializer = value.values.elementSerializer() as KSerializer<Any>
-
-        (keySerializer to valueSerializer).map
+        MapSerializer(keySerializer, valueSerializer)
     }
     else -> value::class.serializer()
 }
 
-@UseExperimental(ImplicitReflectionSerializer::class)
+@OptIn(ImplicitReflectionSerializer::class)
 private fun Collection<*>.elementSerializer(): KSerializer<*> {
     @Suppress("DEPRECATION_ERROR")
     val serializers = filterNotNull().map { buildSerializer(it) }.distinctBy { it.descriptor.name }

@@ -23,12 +23,22 @@ import kotlinx.coroutines.*
  */
 class Logging(
     val logger: Logger,
-    var level: LogLevel
+    var level: LogLevel,
+    var filters: List<(HttpRequestBuilder) -> Boolean>
 ) {
+    /**
+     * Constructor
+     */
+    constructor(logger: Logger, level: LogLevel) : this(logger, level, emptyList())
+
     /**
      * [Logging] feature configuration
      */
     class Config {
+        /**
+         * filters
+         */
+        internal var filters = mutableListOf<(HttpRequestBuilder) -> Boolean>()
         /**
          * [Logger] instance to use
          */
@@ -38,6 +48,13 @@ class Logging(
          * log [LogLevel]
          */
         var level: LogLevel = LogLevel.HEADERS
+
+        /**
+         * Log messages for calls matching a [predicate]
+         */
+        fun filter(predicate: (HttpRequestBuilder) -> Boolean) {
+            filters.add(predicate)
+        }
     }
 
     private suspend fun logRequest(request: HttpRequestBuilder): OutgoingContent? {
@@ -52,24 +69,29 @@ class Logging(
         } else null
     }
 
-    private suspend fun logResponse(response: HttpResponse) {
+    private fun logResponse(response: HttpResponse) {
         if (level.info) {
             logger.log("RESPONSE: ${response.status}")
             logger.log("METHOD: ${response.call.request.method}")
             logger.log("FROM: ${response.call.request.url}")
         }
 
-        if (level.headers) logHeaders(response.headers.entries())
+        if (level.headers) {
+            logHeaders(response.headers.entries())
+        }
     }
 
     private fun logRequestException(context: HttpRequestBuilder, cause: Throwable) {
-        if (!level.info) return
-        logger.log("REQUEST ${Url(context.url)} failed with exception: $cause")
+        if (level.info) {
+            logger.log("REQUEST ${Url(context.url)} failed with exception: $cause")
+        }
+
     }
 
     private fun logResponseException(context: HttpClientCall, cause: Throwable) {
-        if (!level.info) return
-        logger.log("RESPONSE ${context.request.url} failed with exception: $cause")
+        if (level.info) {
+            logger.log("RESPONSE ${context.request.url} failed with exception: $cause")
+        }
     }
 
     private fun logHeaders(
@@ -124,13 +146,17 @@ class Logging(
 
         override fun prepare(block: Config.() -> Unit): Logging {
             val config = Config().apply(block)
-            return Logging(config.logger, config.level)
+            return Logging(config.logger, config.level, config.filters)
         }
 
         override fun install(feature: Logging, scope: HttpClient) {
             scope.sendPipeline.intercept(HttpSendPipeline.Monitoring) {
                 val response = try {
-                    feature.logRequest(context)
+                    if (feature.filters.isEmpty() || feature.filters.any { it(context) }) {
+                        feature.logRequest(context)
+                    } else {
+                        null
+                    }
                 } catch (_: Throwable) {
                     null
                 } ?: subject
@@ -145,6 +171,7 @@ class Logging(
 
             scope.responsePipeline.intercept(HttpResponsePipeline.Receive) {
                 try {
+                    feature.logResponse(context.response)
                     proceedWith(subject)
                 } catch (cause: Throwable) {
                     feature.logResponseException(context, cause)
